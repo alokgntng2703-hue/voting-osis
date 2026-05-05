@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Voting OSIS Online</title>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ?? PASTE CONFIG FIREBASE KAMU DI SINI
+const firebaseConfig = {
+  apiKey: "AIzaSyAyv4e_14CnPSGNjh7SVA2FSouFECKx3Z4",
+  authDomain: "voting-online-e57ee.firebaseapp.com",
+  projectId: "voting-online-e57ee",
+  storageBucket: "voting-online-e57ee.firebasestorage.app",
+  messagingSenderId: "308893894806",
+  appId: "1:308893894806:web:c8d44875b7685a58b05ab7",
+  measurementId: "G-2QD98FDJ4L
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// DATA
+let currentUser = null;
+let selected = null;
+
+// INIT DATA
+async function initDB(){
+  const ref = doc(db, "voting", "data");
+  const snap = await getDoc(ref);
+
+  if(!snap.exists()){
+    await setDoc(ref, {
+      votes: [0,0,0],
+      votedUsers: []
+    });
+  }
+}
+initDB();
+
+// LOGIN
+window.login = async function(){
+  let nis = document.getElementById("nis").value.trim();
+  let pass = document.getElementById("password").value.trim();
+
+  let nisNum = parseInt(nis);
+
+  if(nis === "admin" && pass === "admin"){
+    showAdmin();
+    return;
+  }
+
+  if(nisNum >= 250001 && nisNum <= 250600){
+    if(pass === nis + "*"){
+      currentUser = nis;
+      document.getElementById("loginPage").style.display="none";
+      document.getElementById("votingPage").style.display="block";
+    }else{
+      alert("Password salah!");
+    }
+  }else{
+    alert("NIS tidak valid!");
+  }
+}
+
+// PILIH
+window.selectCandidate = function(i){
+  selected = i;
+  document.querySelectorAll(".candidate").forEach(c=>c.classList.remove("selected"));
+  document.querySelectorAll(".candidate")[i].classList.add("selected");
+}
+
+// VOTE
+window.vote = async function(){
+  if(selected === null) return alert("Pilih dulu!");
+
+  const ref = doc(db, "voting", "data");
+  const snap = await getDoc(ref);
+  let data = snap.data();
+
+  if(data.votedUsers.includes(currentUser)){
+    return alert("Kamu sudah voting!");
+  }
+
+  data.votes[selected]++;
+  data.votedUsers.push(currentUser);
+
+  await updateDoc(ref, data);
+
+  alert("Vote berhasil!");
+}
+
+// REALTIME RESULT
+const ref = doc(db, "voting", "data");
+onSnapshot(ref, (snap)=>{
+  if(!snap.exists()) return;
+
+  let data = snap.data();
+  let votes = data.votes;
+  let total = votes.reduce((a,b)=>a+b,0);
+
+  let names = ["Andi","Budi","Citra"];
+  let html = "<h3>Hasil Voting:</h3>";
+
+  votes.forEach((v,i)=>{
+    let p = total ? ((v/total)*100).toFixed(1) : 0;
+    html += `${names[i]} (${v} suara - ${p}%)<div class="bar" style="width:${p}%"></div>`;
+  });
+
+  document.getElementById("result").innerHTML = html;
+  document.getElementById("adminResult").innerHTML = html;
+});
+
+// ADMIN
+window.showAdmin = function(){
+  document.getElementById("loginPage").style.display="none";
+  document.getElementById("adminPage").style.display="block";
+}
+
+window.resetVoting = async function(){
+  if(confirm("Reset semua?")){
+    await setDoc(doc(db,"voting","data"), {
+      votes:[0,0,0],
+      votedUsers:[]
+    });
+  }
+}
+</script>
+
+<style>
+body{font-family:Arial;background:#4facfe;margin:0}
+.container{background:white;max-width:500px;margin:50px auto;padding:20px;border-radius:10px;text-align:center}
+input,button{padding:10px;margin:5px;width:90%}
+.candidate{border:1px solid #ccc;padding:10px;margin:10px;cursor:pointer}
+.selected{background:#d0ebff}
+.bar{height:20px;background:#4facfe;margin-top:5px}
+</style>
+</head>
+
+<body>
+
+<div class="container" id="loginPage">
+<h2>Login</h2>
+<input id="nis" placeholder="NIS">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+
+<div class="container" id="votingPage" style="display:none">
+<h2>Voting</h2>
+
+<div class="candidate" onclick="selectCandidate(0)">Andi</div>
+<div class="candidate" onclick="selectCandidate(1)">Budi</div>
+<div class="candidate" onclick="selectCandidate(2)">Citra</div>
+
+<button onclick="vote()">Vote</button>
+<div id="result"></div>
+</div>
+
+<div class="container" id="adminPage" style="display:none">
+<h2>Admin</h2>
+<div id="adminResult"></div>
+<button onclick="resetVoting()">Reset</button>
+</div>
+
+</body>
+</html>
